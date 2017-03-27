@@ -25,6 +25,8 @@ namespace Bot_Application
             if (activity.Type == ActivityTypes.Message)
             {
                 await Conversation.SendAsync(activity, () => new IADialag());
+                var luisData = await GetEntityFromLUIS(activity.Text);
+                await DocumentDBRepository<LUISData>.CreateItemAsync(luisData);
                 ////ConnectorClient connector = new ConnectorClient(new Uri(activity.ServiceUrl));
                 ////// calculate something for us to return
                 ////int length = (activity.Text ?? string.Empty).Length;
@@ -39,6 +41,31 @@ namespace Bot_Application
             }
             var response = Request.CreateResponse(HttpStatusCode.OK);
             return response;
+        }
+
+        private static async Task<LUISData> GetEntityFromLUIS(string Query)
+        {
+            Query = Uri.EscapeDataString(Query);
+            LUISData Data = new LUISData();
+            using (HttpClient client = new HttpClient())
+            {
+                string RequestUri = "https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/70e9d5b3-604b-4357-a195-b0cde71391f9?subscription-key=2f6fc2999da5443e9e2e7a38f396d80c&timezoneOffset=0.0&verbose=true&q=" + Query;
+                HttpResponseMessage msg = await client.GetAsync(RequestUri);
+
+                if (msg.IsSuccessStatusCode)
+                {
+                    var JsonDataResponse = await msg.Content.ReadAsStringAsync();
+                    Data = JsonConvert.DeserializeObject<LUISData>(JsonDataResponse);
+                }
+            }
+
+            return Data;
+        }
+
+        public async Task<LUISData> Get(string id)
+        {
+            LUISData item = await DocumentDBRepository<LUISData>.GetItemAsync(id);
+            return item;
         }
 
         private Activity HandleSystemMessage(Activity message)
